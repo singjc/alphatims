@@ -4,10 +4,12 @@
 import os
 import numpy as np
 import pandas as pd
+import param
 import panel as pn
 import sys
 import warnings
 import logging
+from decimal import Decimal
 # holoviz libraries
 import holoviews as hv
 import bokeh.server.views.ws
@@ -15,6 +17,7 @@ import bokeh.server.views.ws
 import alphatims.bruker
 import alphatims.utils
 import alphatims.plotting
+import alphatims.osw_parser
 
 
 # TODO: do we want to ignore warnings?
@@ -78,7 +81,7 @@ h2 {
     background-color: #045082;
     font-size: 11px;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: uppercase;ase/discussions
     letter-spacing: 1.5px;
 }
 
@@ -243,6 +246,72 @@ quit_button = pn.widgets.Button(
     margin=(34, 20, 0, 0)
 )
 
+## OSW Import Options
+upload_osw = pn.Param(
+    alphatims.osw_parser.OSWFile().param['oswfile'], 
+    widgets={'oswfile': {"widget_type":pn.widgets.TextInput, "placeholder":'*.osw'}}
+)
+
+peptide_list_ui = pn.widgets.Select(
+    name='Peptide', 
+    options=[None]
+    )
+precursor_charge_list_ui = pn.widgets.Select(
+    name='Charge', 
+    options=[None]
+    )
+feature_id_rank_list_ui = pn.widgets.Select(
+    name='Feature ID', 
+    options=[None]
+    )
+static_precursor_mz_info = pn.widgets.StaticText(
+    name="Precursor m/z", 
+    value=""
+    )
+static_peak_group_rank_info = pn.widgets.StaticText(
+    name="Peak Group Rank", 
+    value=""
+    )
+static_peak_group_qvalue_info = pn.widgets.StaticText(
+    name="Peak-Group Q-Value", 
+    value=""
+    )
+static_rt_info = pn.widgets.StaticText(
+    name="Retention Time", 
+    value=""
+    )
+static_im_info = pn.widgets.StaticText(
+    name="Ion Mobility", 
+    value=""
+    )
+static_intensity_info = pn.widgets.StaticText(
+    name="Intensity", 
+    value=""
+    )
+static_ipf_m_score_info = pn.widgets.StaticText(
+    name="IPF Q-Value", 
+    value=""
+    )
+
+# upload_file = pn.widgets.TextInput(
+#     name='Specify an experimental file:',
+#     placeholder='Enter the whole path to Bruker .d folder or .hdf file',
+#     align="center",
+#     # width=800,
+#     sizing_mode="stretch_width",
+#     margin=(15, 15, 0, 15)
+# )
+# upload_button = pn.widgets.Button(
+#     name='Upload Data',
+#     button_type='primary',
+#     height=31,
+#     width=100,
+#     margin=(34, 20, 0, 20)
+# )
+
+# upload_osw = pn.widgets.FileInput(
+#     accept = '.osw'
+# )
 # if os.path.exists(alphatims.utils.DEMO_FILE_NAME):
 #     download_demo = None
 #     demo_dataset = pn.widgets.Button(
@@ -388,6 +457,19 @@ main_part = pn.Column(
         width=800,
         margin=(-15, 0, 0, 0)
     ),
+    # pn.Row(
+    #     pn.Column(
+    #         upload_osw_text,
+    #         upload_osw,
+    #     ),
+    #     # background='#eaeaea',
+    #     align='start',
+    #     sizing_mode='stretch_width',
+    #     # height=190,
+    #     # margin=(10, 8, 10, 8),
+    #     # css_classes=['background']
+    # ),
+    align='center',
     background='#eaeaea',
     sizing_mode='stretch_width',
     height=360,
@@ -829,8 +911,139 @@ plot2_x_axis = pn.widgets.Select(
     align='center',
 )
 
-
 # Collapsing all options to cards
+import_osw_card = pn.Card(
+    upload_osw,
+    peptide_list_ui,
+    precursor_charge_list_ui,
+    feature_id_rank_list_ui,
+    static_precursor_mz_info,
+    static_peak_group_rank_info,
+    static_peak_group_qvalue_info,
+    static_ipf_m_score_info,
+    static_rt_info,
+    static_im_info,
+    static_intensity_info,
+    title='Import Pyprophet Scored OSW',
+    collapsed=True,
+    width=430,
+    margin=(10, 10, 10, 15),
+    background='#EAEAEA',
+    header_background='EAEAEA',
+    css_classes=['axis_selection_settings']
+)
+import_osw_card.jscallback(
+        collapsed="""
+        var $container = $("html,body");
+        var $scrollTo = $('.test');
+
+        $container.animate({scrollTop: $container.offset().top + $container.scrollTop(), scrollLeft: 0},300);
+        """,
+    args={'card': import_osw_card}
+)
+
+@pn.depends(
+    upload_osw.object.param.oswfile, 
+    watch=True
+    )
+def _update_peptide_list(*args):
+    if upload_osw.object.oswfile_data is not None:
+        peptide_list = list(set(upload_osw.object.oswfile_data.FullPeptideName.to_list()))
+        peptide_list.sort()
+        logging.info(f"INFO: Populating Peptide List with {len(peptide_list)} peptides")
+        peptide_list_ui.options = peptide_list
+        peptide_list_ui.value = peptide_list[0]
+    else:
+        peptide_list_ui.options = [None]
+
+@pn.depends(
+    peptide_list_ui.param.value, 
+    watch=True
+    )
+def _update_peptide_slection(*args):
+    if peptide_list_ui.value is not None:
+        upload_osw.object.subset_data_for_peptide(peptide=peptide_list_ui.value)
+
+@pn.depends(
+    peptide_list_ui.param.value, 
+    upload_osw.object.param.oswfile, 
+    watch=True
+    )
+def _update_precursor_charge_list(*args):
+    if upload_osw.object.oswfile_data_current_peptide_subset is not None:
+        precursor_charge_list_ui.options = list(set(upload_osw.object.oswfile_data_current_peptide_subset.precursor_charge.to_list()))
+        precursor_charge_list_ui.value = list(set(upload_osw.object.oswfile_data_current_peptide_subset.precursor_charge.to_list()))[0]
+    else:
+        precursor_charge_list_ui.options = [None]
+
+@pn.depends(
+    peptide_list_ui.param.value,
+    precursor_charge_list_ui.param.value,
+    watch=True
+    )
+def _update_precursor_charge_slection(*args):
+    if precursor_charge_list_ui.value is not None:
+        upload_osw.object.subset_data_for_charge(charge=precursor_charge_list_ui.value)
+
+@pn.depends(
+    peptide_list_ui.param.value, 
+    precursor_charge_list_ui.param.value,
+    upload_osw.object.param.oswfile, 
+    watch=True
+    )
+def _update_feature_id_list(*args):
+    if upload_osw.object.oswfile_data_current_peptide_charge_subset is not None:
+        feature_id_rank_list_ui.options = list(set(upload_osw.object.oswfile_data_current_peptide_charge_subset.feature_id.to_list()))
+        feature_id_rank_list_ui.value = list(set(upload_osw.object.oswfile_data_current_peptide_charge_subset.feature_id.to_list()))[0]
+    else:
+        feature_id_rank_list_ui.options = [None]
+
+@pn.depends(
+    peptide_list_ui.param.value,
+    precursor_charge_list_ui.param.value,
+    feature_id_rank_list_ui.param.value,  
+    watch=True
+    )
+def _update_feature_id_slection(*args):
+    if feature_id_rank_list_ui.value is not None:
+        upload_osw.object.subset_data_for_feature_id(feature_id=feature_id_rank_list_ui.value)
+
+@pn.depends(
+    peptide_list_ui.param.value, 
+    precursor_charge_list_ui.param.value, 
+    feature_id_rank_list_ui.param.value, 
+    upload_osw.object.param.oswfile, 
+    watch=True
+    )
+def _get_updated_selection_values(*args):
+    upload_osw.object.get_rt_feature_data()
+
+@pn.depends(
+    peptide_list_ui.param.value, 
+    precursor_charge_list_ui.param.value, 
+    feature_id_rank_list_ui.param.value, 
+    upload_osw.object.param.oswfile, 
+    watch=True
+    )
+def _update_static_osw_info(*args):
+    if upload_osw.object.oswfile_data_current_peptide_charge_peak_subset is not None:
+        static_precursor_mz_info.value = round(upload_osw.object.precursor_mz, 4)
+        static_peak_group_rank_info.value =  round(upload_osw.object.peak_group_rank, 1)
+        static_peak_group_qvalue_info.value = f"{Decimal(upload_osw.object.ms2_m_score):.2E}" #round(upload_osw.object.ms2_m_score, 4)
+        static_ipf_m_score_info.value = f"{Decimal(upload_osw.object.ipf_m_score):.2E}" #round(upload_osw.object.ipf_m_score, 4)
+        static_rt_info.value = round(upload_osw.object.RT, 4)
+        static_im_info.value = round(upload_osw.object.IM, 4)
+        static_intensity_info.value = round(upload_osw.object.Intensity, 4)
+    else:
+        static_precursor_mz_info.value = ""
+        static_peak_group_rank_info.value =  ""
+        static_peak_group_qvalue_info.value = ""
+        static_ipf_m_score_info.value = ""
+        static_rt_info.value = ""
+        static_im_info.value = ""
+        static_intensity_info.value = ""
+
+
 frame_selection_card = pn.Card(
     player_title,
     player,
@@ -1092,6 +1305,8 @@ strike_estimate = pn.widgets.IntInput(
 settings = pn.Column(
     settings_title,
     card_divider,
+    import_osw_card,
+    card_divider,
     frame_selection_card,
     card_divider,
     scan_selection_card,
@@ -1234,7 +1449,6 @@ def show_df():
         )
     else:
         return None
-
 
 def upload_data(*args):
     sys.path.append('../')
@@ -1405,7 +1619,7 @@ def init_settings(*args):
                 ),
             }
         )
-
+        print("UPDATES")
         update_frame_widgets_to_stack()
         update_scan_widgets_to_stack()
         update_quad_widgets_to_stack()
@@ -1489,7 +1703,6 @@ def init_settings(*args):
     else:
         BROWSER[0] = None
 
-
 @pn.depends(
     player.param.value,
     watch=True
@@ -1536,6 +1749,8 @@ def update_frame_with_player(*args):
     # precursor_fragment_toggle_button.param.value,
     select_ms1_precursors.param.value,
     select_ms2_fragments.param.value,
+
+    
     watch=True,
 )
 def update_plots_and_settings(*args):
@@ -1839,6 +2054,11 @@ def update_intensity_widgets_to_stack():
     frame_end.param.value,
     rt_start.param.value,
     rt_end.param.value,
+
+    upload_osw.object.param.oswfile,
+    peptide_list_ui.param.value,
+    precursor_charge_list_ui.param.value,
+    feature_id_rank_list_ui.param.value,
     watch=True
 )
 def check_frames_stack(*args):
@@ -1860,6 +2080,14 @@ def check_frames_stack(*args):
         updated_option, updated_value = STACK.update(
             "frames", (int(start_), int(end_))
         )
+    if updated_value is None and upload_osw.object.leftWidth is not None and upload_osw.object.rightWidth is not None:
+        start_, end_ = DATASET.convert_to_indices(
+            np.array([upload_osw.object.leftWidth, upload_osw.object.rightWidth]) * 60,
+            return_frame_indices=True
+        )
+        updated_option, updated_value = STACK.update(
+            "frames", (int(start_), int(end_))
+        )    
     if updated_value is not None:
         if current_low != updated_value[0]:
             if updated_value[0] >= updated_value[1]:
@@ -1875,8 +2103,14 @@ def check_frames_stack(*args):
         update_frame_widgets_to_stack()
         update_global_selection(updated_option, updated_value)
 
-
-def check_scans_stack():
+@pn.depends(
+    upload_osw.object.param.oswfile,
+    peptide_list_ui.param.value,
+    precursor_charge_list_ui.param.value,
+    feature_id_rank_list_ui.param.value,
+    watch=True
+)
+def check_scans_stack(*args):
     current_low, current_max = STACK["scans"]
     updated_option, updated_value = STACK.update(
         "scans", scan_slider.value
@@ -1888,6 +2122,14 @@ def check_scans_stack():
     if updated_value is None:
         start_, end_ = DATASET.convert_to_indices(
             np.array([im_start.value, im_end.value])[::-1],
+            return_scan_indices=True
+        )[::-1]
+        updated_option, updated_value = STACK.update(
+            "scans", (int(start_), int(end_))
+        )
+    if "IM_leftWidth" in dir(upload_osw.object) and "IM_rightWidth" in dir(upload_osw.object) and upload_osw.object.IM_leftWidth is not None and upload_osw.object.IM_rightWidth is not None :
+        start_, end_ = DATASET.convert_to_indices(
+            np.array([upload_osw.object.IM_leftWidth, upload_osw.object.IM_rightWidth])[::-1],
             return_scan_indices=True
         )[::-1]
         updated_option, updated_value = STACK.update(
@@ -1905,6 +2147,8 @@ def check_scans_stack():
             updated_option, updated_value = STACK.update(
                 "scans", (updated_value[1], updated_value[1] + 1)
             )
+    update_scan_widgets_to_stack()
+    update_global_selection(updated_option, updated_value)
     return updated_option, updated_value
 
 
@@ -1955,8 +2199,14 @@ def check_precursors_stack():
             )
     return updated_option, updated_value
 
-
-def check_tofs_stack():
+@pn.depends(
+    upload_osw.object.param.oswfile,
+    peptide_list_ui.param.value,
+    precursor_charge_list_ui.param.value,
+    feature_id_rank_list_ui.param.value,
+    watch=True
+)
+def check_tofs_stack(*args):
     current_low, current_max = STACK["tofs"]
     updated_option, updated_value = STACK.update(
         "tofs", tof_slider.value
@@ -1968,6 +2218,15 @@ def check_tofs_stack():
     if updated_value is None:
         start_, end_ = DATASET.convert_to_indices(
             np.array([mz_start.value, mz_end.value]),
+            return_tof_indices=True
+        )
+        updated_option, updated_value = STACK.update(
+            "tofs", (int(start_), int(end_))
+        )
+    # If OSW File is provided
+    if "precursor_mz" in dir(upload_osw.object) and upload_osw.object.precursor_mz is not None:
+        start_, end_ = DATASET.convert_to_indices(
+            np.array([upload_osw.object.precursor_mz-0.01, upload_osw.object.precursor_mz+0.01]),
             return_tof_indices=True
         )
         updated_option, updated_value = STACK.update(
@@ -1985,6 +2244,8 @@ def check_tofs_stack():
             updated_option, updated_value = STACK.update(
                 "tofs", (updated_value[1], updated_value[1] + 1)
             )
+    update_tof_widgets_to_stack()
+    update_global_selection(updated_option, updated_value)
     return updated_option, updated_value
 
 
