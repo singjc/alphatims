@@ -2127,7 +2127,7 @@ def check_scans_stack(*args):
         updated_option, updated_value = STACK.update(
             "scans", (int(start_), int(end_))
         )
-    if "IM_leftWidth" in dir(upload_osw.object) and "IM_rightWidth" in dir(upload_osw.object) and upload_osw.object.IM_leftWidth is not None and upload_osw.object.IM_rightWidth is not None :
+    if updated_value is None and "IM_leftWidth" in dir(upload_osw.object) and "IM_rightWidth" in dir(upload_osw.object) and upload_osw.object.IM_leftWidth is not None and upload_osw.object.IM_rightWidth is not None :
         start_, end_ = DATASET.convert_to_indices(
             np.array([upload_osw.object.IM_leftWidth, upload_osw.object.IM_rightWidth])[::-1],
             return_scan_indices=True
@@ -2224,7 +2224,7 @@ def check_tofs_stack(*args):
             "tofs", (int(start_), int(end_))
         )
     # If OSW File is provided
-    if "precursor_mz" in dir(upload_osw.object) and upload_osw.object.precursor_mz is not None:
+    if updated_value is None and "precursor_mz" in dir(upload_osw.object) and upload_osw.object.precursor_mz is not None:
         start_, end_ = DATASET.convert_to_indices(
             np.array([upload_osw.object.precursor_mz-0.01, upload_osw.object.precursor_mz+0.01]),
             return_tof_indices=True
