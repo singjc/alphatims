@@ -28,9 +28,6 @@ class OSWFile(param.Parameterized):
     oswfile = param.FileSelector(allow_None=False, doc="(Required) path to '.osw' file processed by OpenSwathWorkflow and PyProphet", precedence=1) 
 
     def __init__(self, initiateOswFile=None, **params):
-        super().__init__(**params)
-        if not initiateOswFile is None:
-            self.oswfile = initiateOswFile
         self.oswfile_data = None
         self.oswfile_data_current_peptide_subset = None
         self.oswfile_data_current_peptide_charge_subset = None
@@ -46,9 +43,15 @@ class OSWFile(param.Parameterized):
         self.Intensity = None
         self.ms2_m_score = None
         self.ipf_m_score = None
+        super().__init__(**params)
+        if not initiateOswFile is None:
+            self.param.update(oswfile=initiateOswFile)
+ 
 
     @param.depends('oswfile', watch=True)  
     def process_file(self):
+        print("processing file....")
+        print(self.oswfile)
         if self.oswfile != "":
             logging.info( f'INFO: Processing file - {self.oswfile}' )
             # Initiate connection to file
@@ -90,6 +93,7 @@ class OSWFile(param.Parameterized):
                         '''
                 logging.info( f'INFO: Reading peak group-level results.' )
                 self.oswfile_data = pd.read_sql_query(query, con).sort_values(["Sequence", "FullPeptideName", "precursor_charge", "peak_group_rank"])
+                print(self.oswfile_data)
             elif score_ms2_present and score_ipf_present:
                 query = '''
                         SELECT 
@@ -156,6 +160,7 @@ class OSWFile(param.Parameterized):
             self.ms2_m_score = None
             self.ipf_m_score = None
             logging.error( f'INFO: Cleared loaded OSW file...' )
+        print(self.param.values())
         return self
     
     def subset_data_for_peptide(self, peptide):
