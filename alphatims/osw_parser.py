@@ -27,9 +27,10 @@ class OSWFile(param.Parameterized):
     # File Selection paramater object
     oswfile = param.FileSelector(allow_None=False, doc="(Required) path to '.osw' file processed by OpenSwathWorkflow and PyProphet", precedence=1) 
 
-    def __init__(self, **params):
-        print("hello")
+    def __init__(self, initiateOswFile=None, **params):
         super().__init__(**params)
+        if not initiateOswFile is None:
+            self.oswfile = initiateOswFile
         self.oswfile_data = None
         self.oswfile_data_current_peptide_subset = None
         self.oswfile_data_current_peptide_charge_subset = None
