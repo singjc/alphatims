@@ -20,13 +20,16 @@ class OSWFile(param.Parameterized):
     """
         Class to Process OSW File
         Adopted from: https://stackoverflow.com/questions/58400769/panel-param-fileinput-widget-and-param-depends-interaction
+
+        For more information on processing DIA data with OpenSwath please see http://openswath.org/en/latest/
     """
     
     # File Selection paramater object
-    oswfile = param.FileSelector() 
+    oswfile = param.FileSelector(allow_None=False, doc="(Required) path to '.osw' file processed by OpenSwathWorkflow and PyProphet", precedence=1) 
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **params):
+        print("hello")
+        super().__init__(**params)
         self.oswfile_data = None
         self.oswfile_data_current_peptide_subset = None
         self.oswfile_data_current_peptide_charge_subset = None
