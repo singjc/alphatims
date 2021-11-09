@@ -49,7 +49,7 @@ class OSWFile(param.Parameterized):
 
     @param.depends('oswfile', watch=True)  
     def process_file(self):
-        if self.oswfile is not "":
+        if self.oswfile != "":
             logging.info( f'INFO: Processing file - {self.oswfile}' )
             # Initiate connection to file
             con = sqlite3.connect(self.oswfile)
