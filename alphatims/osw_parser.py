@@ -167,7 +167,12 @@ class OSWFile(param.Parameterized):
         logging.info( f'INFO: Subsetting Identification Results for peptide {peptide}.' )
         self.oswfile_data_current_peptide_subset = self.oswfile_data[ self.oswfile_data.FullPeptideName == peptide ]
         return self
-    
+ 
+    def subset_data_for_precursor(self, precursor):
+        logging.info( f'INFO: Subsetting Identification Results for precursor {precursor}.' )
+        self.oswfile_data_current_precursor_subset = self.oswfile_data[ self.oswfile_data.precursor_id == precursor ]
+        return self
+   
     def subset_data_for_charge(self, charge):
         logging.info( f'INFO: Subsetting Identification Results for precursor charge {charge}.' )
         self.oswfile_data_current_peptide_charge_subset = self.oswfile_data_current_peptide_subset[ self.oswfile_data_current_peptide_subset.precursor_charge == charge ]
