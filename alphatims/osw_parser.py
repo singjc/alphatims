@@ -22,11 +22,14 @@ class OSWFile(param.Parameterized):
         Adopted from: https://stackoverflow.com/questions/58400769/panel-param-fileinput-widget-and-param-depends-interaction
     """
     
+    
     # File Selection paramater object
     oswfile = param.FileSelector() 
 
-    def __init__(self):
+    def __init__(self, oswfile=None):
         super().__init__()
+        if oswfile is not None:
+            self.oswfile = oswfile
         self.oswfile_data = None
         self.oswfile_data_current_peptide_subset = None
         self.oswfile_data_current_peptide_charge_subset = None
@@ -45,8 +48,10 @@ class OSWFile(param.Parameterized):
 
     @param.depends('oswfile', watch=True)  
     def process_file(self):
-        if self.oswfile is not "":
-            logging.info( f'INFO: Processing file - {self.oswfile}' )
+        # if self.oswfile_ui is not None:
+        #     self.oswfile = self.oswfile_ui
+        if self.oswfile is not None:
+            logging.info( f'INFO: Getting Feature Identification Table from - {self.oswfile}' )
             # Initiate connection to file
             con = sqlite3.connect(self.oswfile)
             # Check for necessary tables
@@ -135,7 +140,8 @@ class OSWFile(param.Parameterized):
                 logging.error( f'INFO: Provided OSW file does not seem to be scored. - {self.oswfile}' )
             # Close connection to file
             con.close()
-        else:
+        if self.oswfile is "":
+            # Needed to clear object if FileSelector is cleared. Might be a better way to do this
             self.oswfile_data = None
             self.oswfile_data_current_peptide_subset = None
             self.oswfile_data_current_peptide_charge_subset = None
@@ -184,3 +190,78 @@ class OSWFile(param.Parameterized):
             if "ipf_m_score" in self.oswfile_data_current_peptide_charge_peak_subset.columns.tolist():
                 self.ipf_m_score = self.oswfile_data_current_peptide_charge_peak_subset.iloc[0]['ipf_m_score']
         return self
+
+    def get_transition_list(self):
+        if self.oswfile is not None:
+            logging.info( f'INFO: Getting Transition List Table from - {self.oswfile}' )
+            # Initiate connection to file
+            con = sqlite3.connect(self.oswfile)
+            query = '''
+                    SELECT 
+                        PEPTIDE.ID AS peptide_id,
+                        PRECURSOR.ID AS precursor_id,
+                        TRANSITION.ID AS transition_id,
+                        PEPTIDE.UNMODIFIED_SEQUENCE AS Sequence,
+                        PEPTIDE.MODIFIED_SEQUENCE AS FullPeptideName,
+                        PRECURSOR.PRECURSOR_MZ AS precursor_mz,
+                        PRECURSOR.CHARGE AS precursor_charge,
+                        TRANSITION.PRODUCT_MZ AS product_mz,
+                        TRANSITION.CHARGE AS product_charge,
+                        TRANSITION.TYPE AS product_type,
+                        TRANSITION.ORDINAL AS product_ordinal,
+                        TRANSITION.ANNOTATION AS annotation,
+                        TRANSITION.DETECTING AS detecting,
+                        TRANSITION.IDENTIFYING AS identifying
+                    FROM PRECURSOR
+                    INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+                    INNER JOIN PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
+                    INNER JOIN TRANSITION_PRECURSOR_MAPPING ON TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = PRECURSOR.ID
+                    INNER JOIN TRANSITION ON TRANSITION.ID = TRANSITION_PRECURSOR_MAPPING.TRANSITION_ID
+                    WHERE PRECURSOR.DECOY=0
+                    '''
+            logging.info( f'INFO: Reading Transition Information.' )
+            self.oswfile_transition_list = pd.read_sql_query(query, con).sort_values(["Sequence", "FullPeptideName", "precursor_charge"])
+
+    def get_peptide_dict(self, peptide, peak_group_rank=1, remove_detecting=False, include_identifying=False):
+        """
+            Get a dictionary with peptide information
+
+            Param:
+                peptide:    (str) peptide you want to create a dictionary for
+
+            Return:
+                sequence: peptide sequence
+                mz: mass-to-charge for peptide
+                mobility: ion mobility of peptide from identification results
+                rt: retention of peptide from identification results
+                charge: charge of peptide
+                fragment_mzs:   dictionary of fragment ions and corresponding mzs
+        """
+        ## TODO: feature_data may return results for more than one charge state..
+        feature_data = self.oswfile_data[ (self.oswfile_data.FullPeptideName.eq(peptide) & self.oswfile_data.peak_group_rank.eq(peak_group_rank)) ]
+        if feature_data.shape[0] > 0:
+            transition_data = self.oswfile_transition_list[ (self.oswfile_transition_list.FullPeptideName.eq(peptide) & self.oswfile_transition_list.precursor_charge.eq(feature_data.iloc[0]["precursor_charge"])) ]
+
+            if remove_detecting:
+                logging.error( "INFO: Removing Detecting transitions" )
+                transition_data = transition_data[ transition_data.detecting.eq(0) ]
+
+            if not include_identifying:
+                logging.error( "INFO: Removing Identifying transitions" )
+                transition_data = transition_data[ transition_data.identifying.eq(0) ]
+
+            peptide_dict = { 
+                            "sequence" : peptide,
+                            "mz" : feature_data.iloc[0]["precursor_mz"],
+                            "mobility" : feature_data.iloc[0]["IM"],
+                            "rt" : feature_data.iloc[0]["RT"]*60,
+                            "charge" : feature_data.iloc[0]["precursor_charge"],
+                            "fragment_mzs" : { str(row_dict['product_type']) + str(row_dict['product_ordinal']) : row_dict['product_mz'] for row_dict in transition_data.to_dict(orient="records")}
+                        }
+        
+        else:
+            logging.error( f'INFO: There was no identification results for  - {peptide}' )
+            peptide_dict = {}
+
+
+        return peptide_dict

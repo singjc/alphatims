@@ -249,7 +249,7 @@ quit_button = pn.widgets.Button(
 ## OSW Import Options
 upload_osw = pn.Param(
     alphatims.osw_parser.OSWFile().param['oswfile'], 
-    widgets={'oswfile': {"widget_type":pn.widgets.TextInput, "placeholder":'*.osw'}}
+    widgets={'oswfile': {"widget_type":pn.widgets.TextInput, "value":None, "placeholder":'*.osw'}}
 )
 
 peptide_list_ui = pn.widgets.Select(
