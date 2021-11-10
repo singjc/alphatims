@@ -263,6 +263,24 @@ class OSWFile(param.Parameterized):
         self.oswfile_data_current_peptide_charge_peak_subset = self.oswfile_data_current_peptide_charge_subset[ self.oswfile_data_current_peptide_charge_subset.feature_id == feature_id ]
         return self
 
+    def fetchTransitionsFromPrecursor(self, precursor_id):
+        con = sqlite3.connect(self.oswfile)
+        logging.info( f'INFO: Fetching transitions associated with precursor {precursor_id}.' )
+
+        query = '''
+                SELECT TRANSITION.TYPE || TRANSITION.ORDINAL as ANNOTATION,
+                TRANSITION.PRODUCT_MZ
+                from TRANSITION, TRANSITION_PRECURSOR_MAPPING
+                where TRANSITION_PRECURSOR_MAPPING.transition_id = TRANSITION.id and TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = {}
+                '''.format(precursor_id)
+
+        self.osw_data_fragment_ions = pd.read_sql_query(query, con)
+        con.close()
+        return self
+        
+
+
+
     def get_rt_feature_data(self):
         if self.oswfile_data_current_peptide_charge_peak_subset is not None:
             self.precursor_mz = self.oswfile_data_current_peptide_charge_peak_subset.iloc[0]['precursor_mz']
