@@ -34,6 +34,7 @@ class OSWFile(param.Parameterized):
         self.oswfile_data_current_peptide_subset = None
         self.oswfile_data_current_peptide_charge_subset = None
         self.oswfile_data_current_peptide_charge_peak_subset = None
+        self.oswfile_data_current_precursor_subset = None
         self.RT = None
         self.leftWidth = None
         self.rightWidth = None
@@ -147,6 +148,7 @@ class OSWFile(param.Parameterized):
             self.oswfile_data_current_peptide_subset = None
             self.oswfile_data_current_peptide_charge_subset = None
             self.oswfile_data_current_peptide_charge_peak_subset = None
+            self.oswfile_data_current_precursor_subset = None
             self.RT = None
             self.leftWidth = None
             self.rightWidth = None
