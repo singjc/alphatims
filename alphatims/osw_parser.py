@@ -22,7 +22,6 @@ class OSWFile(param.Parameterized):
         Adopted from: https://stackoverflow.com/questions/58400769/panel-param-fileinput-widget-and-param-depends-interaction
     """
     
-    
     # File Selection paramater object
     oswfile = param.FileSelector() 
 
@@ -48,8 +47,9 @@ class OSWFile(param.Parameterized):
 
     @param.depends('oswfile', watch=True)  
     def process_file(self):
-        # if self.oswfile_ui is not None:
-        #     self.oswfile = self.oswfile_ui
+        """
+            Method for Extracting an feature identification results table
+        """
         if self.oswfile is not None:
             logging.info( f'INFO: Getting Feature Identification Table from - {self.oswfile}' )
             # Initiate connection to file
@@ -192,6 +192,9 @@ class OSWFile(param.Parameterized):
         return self
 
     def get_transition_list(self):
+        """
+            Method for extracting a peptide-transition list table from an OSW file
+        """
         if self.oswfile is not None:
             logging.info( f'INFO: Getting Transition List Table from - {self.oswfile}' )
             # Initiate connection to file
@@ -221,6 +224,8 @@ class OSWFile(param.Parameterized):
                     '''
             logging.info( f'INFO: Reading Transition Information.' )
             self.oswfile_transition_list = pd.read_sql_query(query, con).sort_values(["Sequence", "FullPeptideName", "precursor_charge"])
+            # Close connection to file
+            con.close()
 
     def get_peptide_dict(self, peptide, peak_group_rank=1, remove_detecting=False, include_identifying=False):
         """
@@ -228,6 +233,9 @@ class OSWFile(param.Parameterized):
 
             Param:
                 peptide:    (str) peptide you want to create a dictionary for
+                peak_group_rank:    (int) feature peak group rank identified by OpenSwathWorkflow
+                remove_detecting:   (bool)  remove detecting transitions
+                include_idenifying: (bool)  include identifying transitions
 
             Return:
                 sequence: peptide sequence
@@ -243,11 +251,11 @@ class OSWFile(param.Parameterized):
             transition_data = self.oswfile_transition_list[ (self.oswfile_transition_list.FullPeptideName.eq(peptide) & self.oswfile_transition_list.precursor_charge.eq(feature_data.iloc[0]["precursor_charge"])) ]
 
             if remove_detecting:
-                logging.error( "INFO: Removing Detecting transitions" )
+                logging.info( "INFO: Removing Detecting transitions" )
                 transition_data = transition_data[ transition_data.detecting.eq(0) ]
 
             if not include_identifying:
-                logging.error( "INFO: Removing Identifying transitions" )
+                logging.info( "INFO: Removing Identifying transitions" )
                 transition_data = transition_data[ transition_data.identifying.eq(0) ]
 
             peptide_dict = { 
@@ -258,10 +266,8 @@ class OSWFile(param.Parameterized):
                             "charge" : feature_data.iloc[0]["precursor_charge"],
                             "fragment_mzs" : { str(row_dict['product_type']) + str(row_dict['product_ordinal']) : row_dict['product_mz'] for row_dict in transition_data.to_dict(orient="records")}
                         }
-        
         else:
             logging.error( f'INFO: There was no identification results for  - {peptide}' )
             peptide_dict = {}
-
 
         return peptide_dict
