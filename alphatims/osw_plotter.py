@@ -22,7 +22,7 @@ class OSWPlotter:
         self.timsTOF = timsTOF
 
 
-    def plotPrecursor(self, precursorId, rank=1, **kwargs):
+    def plotPrecursor(self, precursorId, rank=1, lineplot_kwargs=dict(x_axis_label='rt', remove_zeros=True), heatmap_kwargs=dict(), **kwargs):
         """
             Given a precursor Id, plot precursor XIC
             precursorId (int) --> id corresponding to osw file of precursor
@@ -33,11 +33,11 @@ class OSWPlotter:
         precursorMetaData = self.oswFile.oswfile_data_current_precursor_subset[self.oswFile.oswfile_data_current_precursor_subset['peak_group_rank'] == 1.0].iloc[0]
         precursor=PeptideExtraction(mz = precursorMetaData['precursor_mz'], im = precursorMetaData['IM'], rt = precursorMetaData['RT'] * 60, peptideSequence=precursorMetaData['FullPeptideName'], charge=int(precursorMetaData['precursor_charge']))
 
-        return precursor.inspect_peptide(self.timsTOF, **kwargs)
+        return precursor.inspect_peptide(self.timsTOF, lineplot_kwargs=lineplot_kwargs, heatmap_kwargs=heatmap_kwargs, **kwargs)
 
 
 
-    def plotPrecursorAndTransition(self, precursorId, rank=1, **kwargs):
+    def plotPrecursorAndTransition(self, precursorId, rank=1, lineplot_kwargs=dict(x_axis_label='rt', remove_zeros=True), heatmap_kwargs=dict(), **kwargs):
         """
             Given a precursor Id, plot the precursor XIC with its corresponding fragments
             precursorId (int) --> id corresponding to osw file of precursor
@@ -52,7 +52,7 @@ class OSWPlotter:
  
         precursor=PeptideExtraction(mz = precursorMetaData['precursor_mz'], im = precursorMetaData['IM'], rt = precursorMetaData['RT'] * 60, peptideSequence=precursorMetaData['FullPeptideName'], charge=int(precursorMetaData['precursor_charge']), fragment_mzs=dict(self.oswFile.osw_data_fragment_ions.values))
 
-        return precursor.inspect_peptide(self.timsTOF, **kwargs)
+        return precursor.inspect_peptide(self.timsTOF, lineplot_kwargs=lineplot_kwargs, heatmap_kwargs=heatmap_kwargs, **kwargs)
 
 
         self.oswFile.subset_data_for_precursor(precursorId)
@@ -107,7 +107,7 @@ class PeptideExtraction(param.Parameterized):
 
 
     # this functions is modified from the tutorial nodebook
-    def inspect_peptide(self, dia_data, heatmap=False, save=False, **kwargs):
+    def inspect_peptide(self, dia_data, heatmap=False, save=False, lineplot_kwargs=dict(x_axis_label='rt', remove_zeros=True), heatmap_kwargs=dict()):
         rt_slice = slice(
             self.rt - self.rtExtraction,
             self.rt + self.rtExtraction 
@@ -135,18 +135,16 @@ class PeptideExtraction(param.Parameterized):
                 title="precursor",
                 width=250,
                 height=250,
-                **kwargs
+                **heatmap_kwargs
             )
             overlay = precursor_heatmap
         else:
             precursor_xic = alphatims.plotting.line_plot(
                 dia_data,
                 precursor_indices,
-                x_axis_label="rt",
                 width=900,
-                remove_zeros=True,
                 label="precursor",
-                **kwargs
+                **lineplot_kwargs
             )
             overlay = precursor_xic
         for fragment_name, m in self.fragment_mzs.items():
@@ -176,10 +174,9 @@ class PeptideExtraction(param.Parameterized):
                     fragment_xic = alphatims.plotting.line_plot(
                         dia_data,
                         fragment_indices,
-                        x_axis_label="rt",
                         width=900,
-                        remove_zeros=True,
                         label=fragment_name,
+                        **lineplot_kwargs
                     )
                     overlay *= fragment_xic.opts(muted=True)
         if not heatmap:
@@ -191,7 +188,3 @@ class PeptideExtraction(param.Parameterized):
         return overlay.opts(
             title=f"{self.peptideSequence}_{self.charge}"
         )
-
-
-
-
