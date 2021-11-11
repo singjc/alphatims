@@ -107,7 +107,7 @@ class PeptideExtraction(param.Parameterized):
 
 
     # this functions is modified from the tutorial nodebook
-    def inspect_peptide(self, dia_data, heatmap=False, save=False):
+    def inspect_peptide(self, dia_data, heatmap=False, save=False, **kwargs):
         rt_slice = slice(
             self.rt - self.rtExtraction,
             self.rt + self.rtExtraction 
@@ -134,7 +134,8 @@ class PeptideExtraction(param.Parameterized):
                 y_axis_label="mobility",
                 title="precursor",
                 width=250,
-                height=250
+                height=250,
+                **kwargs
             )
             overlay = precursor_heatmap
         else:
@@ -144,7 +145,8 @@ class PeptideExtraction(param.Parameterized):
                 x_axis_label="rt",
                 width=900,
                 remove_zeros=True,
-                label="precursor"
+                label="precursor",
+                **kwargs
             )
             overlay = precursor_xic
         for fragment_name, m in self.fragment_mzs.items():
@@ -165,7 +167,7 @@ class PeptideExtraction(param.Parameterized):
                         dia_data.as_dataframe(fragment_indices),
                         x_axis_label="rt",
                         y_axis_label="mobility",
-                        title=f"{fragment_name}: {mz:.3f}",
+                        title=f"{fragment_name}: {m:.3f}",
                         width=250,
                         height=250,
                     )
