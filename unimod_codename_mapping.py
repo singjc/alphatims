@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import sqlite3
 
 osw_file = sqlite3.connect("")
 peptide_df = pd.read_sql_query("SELECT * FROM PEPTIDE", osw_file)
