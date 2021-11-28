@@ -97,9 +97,8 @@ class PeptideExtraction(param.Parameterized):
 
     # extraction preferences (optional, already have default values)
     rtExtraction = param.Number(doc='retention time extraction width (in seconds) on either side of the peptide', default=30, allow_None=False)
-    imExtraction = param.Number(doc='IM extraction width (in 1/k0) on either side of the peptide', default=5, allow_None=False)
+    imExtraction = param.Number(doc='IM extraction width (in 1/k0) on either side of the peptide', default=0.05, allow_None=False)
     ppm = param.Number(doc='ppm extraction around the m/z', default=50, allow_None=False)
-
 
     
     def __init__(self, **params):
