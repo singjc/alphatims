@@ -79,6 +79,21 @@ class OSWPlotter:
         pass
 
 
+    def fetchPrecursorAndTransitionDataFromId(self, precursorId):
+        self.oswFile = self.oswFile.subset_data_for_precursor(precursorId)
+        precursorMetaData = self.oswFile.oswfile_data_current_precursor_subset[self.oswFile.oswfile_data_current_precursor_subset['peak_group_rank'] == 1.0].iloc[0]
+
+        # get transition info
+        self.oswFile.fetchTransitionsFromPrecursor(precursorId)
+
+ 
+        precursor=PeptideExtraction(mz = precursorMetaData['precursor_mz'], im = precursorMetaData['IM'], rt = precursorMetaData['RT'] * 60, peptideSequence=precursorMetaData['FullPeptideName'], charge=int(precursorMetaData['precursor_charge']), fragment_mzs=dict(self.oswFile.osw_data_fragment_ions.values))
+
+
+        return precursor.fetchPrecursorAndTransitionData(self.timsTOF)
+
+
+
 class PeptideExtraction(param.Parameterized):
     """
         This class is a parameterized class with information on the peptide to plot
@@ -104,6 +119,48 @@ class PeptideExtraction(param.Parameterized):
     def __init__(self, **params):
         super().__init__(**params)
 
+
+
+    # this function returns a pandas dataframe of the extraction window around the peptide of interest
+    def fetchPrecursorAndTransitionData(self, dia_data):
+        dictOut = {}
+        rt_slice = slice(
+            self.rt - self.rtExtraction,
+            self.rt + self.rtExtraction 
+        )
+        im_slice = slice(
+            self.im - self.imExtraction,
+            self.im + self.imExtraction
+        )
+        precursor_mz_slice = slice(
+            self.mz / (1 + self.ppm / 10**6),
+            self.mz * (1 + self.ppm / 10**6)
+        )
+        precursor_indices = dia_data[
+            rt_slice,
+            im_slice,
+            0, #index 0 means that the quadrupole is not used
+            precursor_mz_slice,
+            "raw"
+        ]
+
+        dictOut['pre'] = dia_data.as_dataframe(precursor_indices)
+ 
+        for fragment_name, m in self.fragment_mzs.items():
+            fragment_mz_slice = slice(
+                m / (1 + self.ppm / 10**6),
+                m * (1 + self.ppm / 10**6)
+            )
+            fragment_indices = dia_data[
+                rt_slice,
+                im_slice,
+                precursor_mz_slice,
+                fragment_mz_slice,
+                "raw"
+            ]
+            dictOut[fragment_name] = dia_data.as_dataframe(fragment_indices)
+
+        return dictOut
 
     # this functions is modified from the tutorial nodebook
     def inspect_peptide(self, dia_data, heatmap=False, save=False, lineplot_kwargs=dict(x_axis_label='rt', remove_zeros=True), heatmap_kwargs=dict()):
