@@ -35,9 +35,7 @@ class OSWPlotter:
 
         return precursor.inspect_peptide(self.timsTOF, lineplot_kwargs=lineplot_kwargs, heatmap_kwargs=heatmap_kwargs, **kwargs)
 
-
-
-    def plotPrecursorAndTransition(self, precursorId, rank=1, lineplot_kwargs=dict(x_axis_label='rt', remove_zeros=True), heatmap_kwargs=dict(), **kwargs):
+    def plotPrecursorAndTransition(self, precursorId, rank=1, precursor_kwargs = dict(), lineplot_kwargs=dict(x_axis_label='rt', remove_zeros=True), heatmap_kwargs=dict(), **kwargs):
         """
             Given a precursor Id, plot the precursor XIC with its corresponding fragments
             precursorId (int) --> id corresponding to osw file of precursor
@@ -52,18 +50,10 @@ class OSWPlotter:
  
         precursor=PeptideExtraction(mz = precursorMetaData['precursor_mz'], im = precursorMetaData['IM'], rt = precursorMetaData['RT'] * 60, peptideSequence=precursorMetaData['FullPeptideName'], charge=int(precursorMetaData['precursor_charge']), fragment_mzs=dict(self.oswFile.osw_data_fragment_ions.values))
 
+        # change parameters (if needed)
+        precursor.param.update(**precursor_kwargs)
+
         return precursor.inspect_peptide(self.timsTOF, lineplot_kwargs=lineplot_kwargs, heatmap_kwargs=heatmap_kwargs, **kwargs)
-
-
-        self.oswFile.subset_data_for_precursor(precursorId)
-        precursorMetaData = self.oswFile.subset_data_for_precursor[ oswFile.oswfile_data_current_precursor_subset['peak_group_rank'] == 1.0].iloc[0]
-
-        # get transition info
-        self.oswFile.fetchTransitionsFromPrecursor(precursorId)
-
-        precursor=PeptideExtraction(mz = precursorMetaData['precursor_mz'], im = precursorMetaData['IM'], rt = precursorMetaData['RT'], peptide=['FullPeptideName'], fragment_ion=dict(self.oswFile.osw_data_fragment_ions.values))
-
-        precursor.inspect_peptide()
 
     
     def plotPrecursorSelection(self):
@@ -120,7 +110,7 @@ class PeptideExtraction(param.Parameterized):
         super().__init__(**params)
 
 
-
+    
     # this function returns a pandas dataframe of the extraction window around the peptide of interest
     def fetchPrecursorAndTransitionData(self, dia_data):
         dictOut = {}
@@ -161,6 +151,44 @@ class PeptideExtraction(param.Parameterized):
             dictOut[fragment_name] = dia_data.as_dataframe(fragment_indices)
 
         return dictOut
+
+    # just plots the precursor)
+    def plotPrecursor(self, dia_data, lineplot_kwargs=dict(x_axis_label='rt', remove_zeros=True), **kwargs):
+        rt_slice = slice(
+            self.rt - self.rtExtraction,
+            self.rt + self.rtExtraction 
+        )
+        im_slice = slice(
+            self.im - self.imExtraction,
+            self.im + self.imExtraction
+        )
+        precursor_mz_slice = slice(
+            self.mz / (1 + self.ppm / 10**6),
+            self.mz * (1 + self.ppm / 10**6)
+        )
+        precursor_indices = dia_data[
+            rt_slice,
+            im_slice,
+            0, #index 0 means that the quadrupole is not used
+            precursor_mz_slice,
+            "raw"
+        ]
+
+        data = dia_data.as_dataframe(precursor_indices)
+        precursor_xic = alphatims.plotting.line_plot(
+                dia_data,
+                precursor_indices,
+                width=900,
+                label="precursor",
+                **kwargs
+            )
+
+        return precursor_xic
+         
+
+
+ 
+
 
     # this functions is modified from the tutorial nodebook
     def inspect_peptide(self, dia_data, heatmap=False, save=False, lineplot_kwargs=dict(x_axis_label='rt', remove_zeros=True), heatmap_kwargs=dict()):
