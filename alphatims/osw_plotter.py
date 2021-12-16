@@ -50,7 +50,7 @@ class OSWPlotter:
  
         precursor=PeptideExtraction(mz = precursorMetaData['precursor_mz'], im = precursorMetaData['IM'], rt = precursorMetaData['RT'] * 60, peptideSequence=precursorMetaData['FullPeptideName'], charge=int(precursorMetaData['precursor_charge']), fragment_mzs=dict(self.oswFile.osw_data_fragment_ions.values))
 
-        # change parameters (if needed)
+        # change parameters
         precursor.param.update(**precursor_kwargs)
 
         return precursor.inspect_peptide(self.timsTOF, lineplot_kwargs=lineplot_kwargs, heatmap_kwargs=heatmap_kwargs, **kwargs)
@@ -69,7 +69,7 @@ class OSWPlotter:
         pass
 
 
-    def fetchPrecursorAndTransitionDataFromId(self, precursorId):
+    def fetchPrecursorAndTransitionDataFromId(self, precursorId, precursor_kwargs = dict()):
         self.oswFile = self.oswFile.subset_data_for_precursor(precursorId)
         precursorMetaData = self.oswFile.oswfile_data_current_precursor_subset[self.oswFile.oswfile_data_current_precursor_subset['peak_group_rank'] == 1.0].iloc[0]
 
@@ -78,6 +78,11 @@ class OSWPlotter:
 
  
         precursor=PeptideExtraction(mz = precursorMetaData['precursor_mz'], im = precursorMetaData['IM'], rt = precursorMetaData['RT'] * 60, peptideSequence=precursorMetaData['FullPeptideName'], charge=int(precursorMetaData['precursor_charge']), fragment_mzs=dict(self.oswFile.osw_data_fragment_ions.values))
+
+        # update parameters
+        precursor.param.update(**precursor_kwargs)
+
+
 
 
         return precursor.fetchPrecursorAndTransitionData(self.timsTOF)
