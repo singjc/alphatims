@@ -29,6 +29,7 @@ class OSWFile(param.Parameterized):
     ms2_m_score_thresh = param.Number(allow_None=True, doc='q_value to filter identification results to (non ipf)', default = 1) # default is no filtering
     ms2_ipf_m_score_thresh = param.Number(allow_None=True, doc='q_value to filter identification results to (with ipf)', default =1) # default is no filtering
     runFiles = param.List(allow_None=True, doc='list of run filenames, only select from these runs', default=None, item_type=str)
+    peakGroupRank  = param.Number(allow_None=False, doc='peak group rank to display blah', default = 1)
 
     def __init__(self, initiateOswFile=None, **params):
         self.oswfile_data = None
@@ -50,9 +51,10 @@ class OSWFile(param.Parameterized):
         super().__init__(**params)
         if not initiateOswFile is None:
             self.param.update(oswfile=initiateOswFile)
+        print(f"[INFO] Loaded {len(self.oswfile_data):,} Peptide Precursors")
  
 
-    @param.depends('oswfile', 'ms2_m_score_thresh', 'ms2_ipf_m_score_thresh', 'runFiles', watch=True)  
+    @param.depends('oswfile', 'ms2_m_score_thresh', 'ms2_ipf_m_score_thresh', 'runFiles', 'peakGroupRank', watch=True)  
     def process_file(self):
         if self.oswfile != "":
             logging.info( f'INFO: Processing file - {self.oswfile}' )
@@ -90,9 +92,9 @@ class OSWFile(param.Parameterized):
                         INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
                         INNER JOIN PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
                         LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-                        WHERE PRECURSOR.DECOY = 0 and SCORE_MS2.QVALUE <= {}
+                        WHERE PRECURSOR.DECOY = 0 and SCORE_MS2.QVALUE <= {} and SCORE_MS2.RANK = {}
                         AND SCORE_MS2.RANK IS NOT NULL -- For some reasons some features aren't scored?
-                        '''.format(self.ms2_m_score_thresh)
+                        '''.format(self.ms2_m_score_thresh, self.peakGroupRank)
                 logging.info( f'INFO: Reading peak group-level results.' )
                 self.oswfile_data = pd.read_sql_query(query, con).sort_values(["Sequence", "FullPeptideName", "precursor_charge", "peak_group_rank"])
             elif score_ms2_present and score_ipf_present and self.runFiles is None:
@@ -135,9 +137,9 @@ class OSWFile(param.Parameterized):
                         ) AS SCORE_IPF ON (SCORE_IPF.FEATURE_ID = FEATURE.ID AND SCORE_IPF.UNIMOD_ID = PEPTIDE.ID)
                         INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
 						INNER JOIN UNIMOD_CODENAME_MAPPING ON UNIMOD_CODENAME_MAPPING.UNIMOD_ID = PEPTIDE.ID
-                        WHERE PRECURSOR.DECOY = 0 AND SCORE_IPF.QVALUE <= {}
+                        WHERE PRECURSOR.DECOY = 0 AND SCORE_IPF.QVALUE <= {} and SCORE_IPF.RANK = {}
                         AND SCORE_MS2.RANK IS NOT NULL -- For some reasons some features aren't scored?
-                        '''.format(self.ms2_ipf_m_score_thresh)
+                        '''.format(self.ms2_ipf_m_score_thresh, self.peakGroupRank)
                 logging.info( f'INFO: Reading peak group-level IPF results.' )
                 self.oswfile_data = pd.read_sql_query(query, con).sort_values(["Sequence", "FullPeptideName", "precursor_charge", "peak_group_rank"])
             elif score_ms2_present and not score_ipf_present and self.runFiles is not None:
@@ -166,9 +168,9 @@ class OSWFile(param.Parameterized):
                         INNER JOIN PRECURSOR_PEPTIDE_MAPPING ON PRECURSOR_PEPTIDE_MAPPING.PRECURSOR_ID = PRECURSOR.ID
                         INNER JOIN PEPTIDE ON PEPTIDE.ID = PRECURSOR_PEPTIDE_MAPPING.PEPTIDE_ID
                         LEFT JOIN SCORE_MS2 ON SCORE_MS2.FEATURE_ID = FEATURE.ID
-                        WHERE PRECURSOR.DECOY = 0 and SCORE_MS2.QVALUE <= {} and RUN.FILENAME in {}
+                        WHERE PRECURSOR.DECOY = 0 and SCORE_MS2.QVALUE <= {} and RUN.FILENAME in {} and SCORE_MS2.RANK = {}
                         AND SCORE_MS2.RANK IS NOT NULL -- For some reasons some features aren't scored?
-                        '''.format(self.ms2_m_score_thresh, self._lstToStr(self.runFiles))
+                        '''.format(self.ms2_m_score_thresh, self._lstToStr(self.runFiles), self.peakGroupRank)
                 logging.info( f'INFO: Reading peak group-level results, filtering by run.' )
                 self.oswfile_data = pd.read_sql_query(query, con).sort_values(["Sequence", "FullPeptideName", "precursor_charge", "peak_group_rank"])
 
@@ -212,9 +214,9 @@ class OSWFile(param.Parameterized):
                         ) AS SCORE_IPF ON (SCORE_IPF.FEATURE_ID = FEATURE.ID AND SCORE_IPF.UNIMOD_ID = PEPTIDE.ID)
                         INNER JOIN PEPTIDE AS PEPTIDE_IPF ON SCORE_IPF.PEPTIDE_ID = PEPTIDE_IPF.ID
 						INNER JOIN UNIMOD_CODENAME_MAPPING ON UNIMOD_CODENAME_MAPPING.UNIMOD_ID = PEPTIDE.ID
-                        WHERE PRECURSOR.DECOY = 0 AND SCORE_IPF.QVALUE <= {} and RUN.FILENAME in {}
+                        WHERE PRECURSOR.DECOY = 0 AND SCORE_IPF.QVALUE <= {} and RUN.FILENAME in {} and SCORE_IPF.RANK = {}
                         AND SCORE_MS2.RANK IS NOT NULL -- For some reasons some features aren't scored?
-                        '''.format(self.ms2_ipf_m_score_thresh, self._lstToStr(self.runFiles))
+                        '''.format(self.ms2_ipf_m_score_thresh, self._lstToStr(self.runFiles), self.peakGroupRank)
                 logging.info( f'INFO: Reading peak group-level IPF results.' )
                 self.oswfile_data = pd.read_sql_query(query, con).sort_values(["Sequence", "FullPeptideName", "precursor_charge", "peak_group_rank"])
  
@@ -262,6 +264,24 @@ class OSWFile(param.Parameterized):
         logging.info( f'INFO: Subsetting Identification Results for feature id {feature_id}.' )
         self.oswfile_data_current_peptide_charge_peak_subset = self.oswfile_data_current_peptide_charge_subset[ self.oswfile_data_current_peptide_charge_subset.feature_id == feature_id ]
         return self
+
+    def fetchTransitionsFromPrecursor(self, precursor_id):
+        con = sqlite3.connect(self.oswfile)
+        logging.info( f'INFO: Fetching transitions associated with precursor {precursor_id}.' )
+
+        query = '''
+                SELECT TRANSITION.TYPE || TRANSITION.ORDINAL as ANNOTATION,
+                TRANSITION.PRODUCT_MZ
+                from TRANSITION, TRANSITION_PRECURSOR_MAPPING
+                where TRANSITION_PRECURSOR_MAPPING.transition_id = TRANSITION.id and TRANSITION_PRECURSOR_MAPPING.PRECURSOR_ID = {}
+                '''.format(precursor_id)
+
+        self.osw_data_fragment_ions = pd.read_sql_query(query, con)
+        con.close()
+        return self
+        
+
+
 
     def get_rt_feature_data(self):
         if self.oswfile_data_current_peptide_charge_peak_subset is not None:
