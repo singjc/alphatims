@@ -15,7 +15,7 @@ import pandas as pd
 
 
 # This class is for plotting 4D data
-# abstract class for plotting
+# abstract class for plotting shold not be used
 class Plotter4D:
     def __init__(self, fIn,
             cmbOpts = dict(tools=['hover']), 
@@ -83,6 +83,10 @@ class Plotter4D:
 
 
 # this class is for getting an MS1 plotter object
+# gets all of the MS1 frames with a slider for retention time
+# Usage:
+# ms1Plot = MS1Plotter("< path to .d")
+# ms1Plot.plot()
 class MS1Plotter(Plotter4D):
     def __init__(self, fIn, **kwargs):
         super().__init__(fIn, **kwargs)
@@ -109,7 +113,10 @@ class MS1Plotter(Plotter4D):
         return super().plot()
 
 
-# This plots a swath
+# This class is used to plot a swath window with a slider across retention time
+# Main usage 
+# swath = SwathPlotter("< path to .d folder")
+# swath.plot(1,1) # for the first swath first multiplex 
 class SwathPlotter(Plotter4D):
 
     def __init__(self, fIn, **kwargs):
