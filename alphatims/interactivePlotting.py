@@ -3,6 +3,7 @@
 
 import alphatims.bruker
 import alphatims.utils
+import alphatims.osw_plotter
 import holoviews as hv
 from holoviews import opts
 import numpy as np
@@ -48,9 +49,12 @@ class Plotter4D:
         return heat
     
     def plotSpectrumAcrossRT(self, frame, x_range):
+        # fetch data
         data = hv.Dataset(self.exp[frame][['mz_values', 'mobility_values', 'intensity_values']], kdims=['mobility_values', 'mz_values'], vdims=['intensity_values'])
         dataSpec = data.redim(intensity_values=hv.Dimension('intensity_across_im'))
-        spectrum = dataSpec.aggregate('mz_values', np.sum).to(hv.Spikes).opts(**self.cmbOpts).opts(**self.specOpts)
+
+        # only select the spectrum that are currently visible in theat heat map and then aggregate
+        spectrum = dataSpec.select(mobility_values=x_range).aggregate('mz_values', np.sum).to(hv.Spikes).opts(**self.cmbOpts).opts(**self.specOpts)
         return spectrum
 
     def plotMobilogramAcrossRT(self, frame, y_range):
@@ -142,10 +146,14 @@ class SwathPlotter(Plotter4D):
 
     # swathNum is the group number (usually between 1-16)
     # multiplex should be value between 1 and 4)
-    def plot(self, swathNum, multiplex):
+    # frameRange = tuple of start and end (non inclusive) frames to plot
+    def plot(self, swathNum, multiplex, frameRange=None):
         # fetch frame list
 
         self.frames = self.fetchSwathFrames(swathNum)
+
+        if frameRange is not None:
+            self.frames = [ i for i in self.frames if i >= frameRange[0] and i < frameRange[1] ]
 
         meta = self.getSwathMetaInfo(swathNum, multiplex)
 
