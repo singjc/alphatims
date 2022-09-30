@@ -65,7 +65,6 @@ class Plotter4D:
     # Define plotting functions
     def plotHeatMapAcrossRT(self, frame, y=0):
 
-        print("[INFO] plotting heat, frame={}".format(frame))
 
         # "correct" frame position to an actual query frame
         closest_frame = self.correctFrame(frame)
@@ -87,7 +86,6 @@ class Plotter4D:
 
 
         # fetch data
-        print("[INFO] plotting spectrum, frame={}\tx_range={}".format(closest_frame, x_range))
         data = hv.Dataset(self.exp[closest_frame][['mz_values', 'mobility_values', 'intensity_values']], kdims=['mobility_values', 'mz_values'], vdims=['intensity_values'])
         dataSpec = data.redim(intensity_values=hv.Dimension('intensity_across_im'))
 
@@ -102,8 +100,6 @@ class Plotter4D:
         self.curFrame = closest_frame
         self.mzRange = y_range
 
-
-        print("[INFO] plotting mobilogram, frame={}\ty_range={}".format(closest_frame, y_range))
         data = hv.Dataset(self.exp[closest_frame][['mz_values', 'mobility_values', 'intensity_values']], kdims=['mobility_values', 'mz_values'], vdims=['intensity_values'])
         dataMob = data.redim(intensity_values=hv.Dimension('intensity_across_mz'))
         mobilogram = dataMob.select(mz_values=y_range).aggregate('mobility_values', np.sum).to(hv.Curve).opts(**self.cmbOpts).opts(**self.mobOpts)
@@ -111,7 +107,6 @@ class Plotter4D:
     
     # for the given range "shown" in the heatmap plot the total intensity
     def plotChromatogram(self, x_range, y_range, y=0):
-        print("[INFO] plotting chromatogram, x_range={}\ty_range={}".format(x_range, y_range))
         data = hv.Dataset(self.exp[self.frames][['mz_values', 'mobility_values', 'intensity_values', 'frame_indices']], kdims=['mobility_values', 'mz_values', 'frame_indices'], vdims=['intensity_values'])
         dataChrom = data.redim(intensity_values=hv.Dimension('total_intensity'))
         chromatogram  = dataChrom.select(mz_values=y_range, mobility_values=x_range).aggregate(['frame_indices'], np.sum).to(hv.Curve).opts(**self.cmbOpts).opts(**self.chromOpts)
@@ -140,14 +135,12 @@ class Plotter4D:
         #mobilogram
         rangeMz = streams.RangeY(y_range=(400, 1200), source=heatRt, transient=True)
         if self.decimateMob:
-            print("Decimating ...")
             mobRt = decimate(hv.DynamicMap(self.plotMobilogramAcrossRT, streams=[rangeMz], kdims=['frame']).redim.values(frame=self.frames).opts(**self.cmbOpts).opts(**self.mobOpts))
         else:
             mobRt = hv.DynamicMap(self.plotChromatogram, streams=[rangeMz], kdims=['frame']).redim.values(frame=self.frames).opts(**self.cmbOpts).opts(**self.mobOpts)
 
         # Chromatogram if selected
         if plotChrom:
-            print("Plotting Chromatogram ...")
             #chrom = hv.DynamicMap(self.plotMobilogramAcrossRT, streams=[rangeMob, rangeMz], kdims=['frame']).redim.values(frame=self.frames).opts(**self.cmbOpts).opts(**self.chromOpts)
             chrom = hv.DynamicMap(self.plotChromatogram, streams=[rangeMz, rangeMob]).opts(**self.cmbOpts).opts(**self.chromOpts)
 
@@ -155,7 +148,6 @@ class Plotter4D:
 
 
     def plotChrom(self):
-        print(self.frames)
         # This is a stream of the current frame, can be created before because it is transient, and needed for initial plotting of other plots
         # create 
         framePointer = streams.SingleTap(x=self.frames[0], y=None, rename={'x':'frame'}, transient=True) 
@@ -171,7 +163,6 @@ class Plotter4D:
         #mobilogram
         rangeMz = streams.RangeY(y_range=(400, 1200), source=heatRt)
         if self.decimateMob:
-            print("Decimating ...")
             mobRt = decimate(hv.DynamicMap(self.plotMobilogramAcrossRT, streams=[rangeMz, framePointer]).opts(**self.cmbOpts).opts(**self.mobOpts))
         else:
             mobRt = hv.DynamicMap(self.plotChromatogram, streams=[rangeMz, framePointer]).opts(**self.cmbOpts).opts(**self.mobOpts)
@@ -181,7 +172,6 @@ class Plotter4D:
         ## frame pointer graph on the chromatogram
         chromPointer = hv.DynamicMap(self.plotChromatogramPointer, streams=[framePointer]).opts(**self.cmbOpts).opts(**self.pointerChromOpts)
 
-        print(self.pointerChromOpts['xlim'])
 
         chromTog = chrom * chromPointer
 
