@@ -42,7 +42,7 @@ class OSWPlotter:
             rank (int) --> which peak group rank to take, default is 1
         """
         self.oswFile = self.oswFile.subset_data_for_precursor(precursorId)
-        precursorMetaData = self.oswFile.oswfile_data_current_precursor_subset[self.oswFile.oswfile_data_current_precursor_subset['peak_group_rank'] == 1.0].iloc[0]
+        precursorMetaData = self.oswFile.oswfile_data_current_precursor_subset[self.oswFile.oswfile_data_current_precursor_subset['peak_group_rank'] == rank].iloc[0]
 
         # get transition info
         self.oswFile.fetchTransitionsFromPrecursor(precursorId)
@@ -87,6 +87,19 @@ class OSWPlotter:
 
         return precursor.fetchPrecursorAndTransitionData(self.timsTOF)
 
+    # fetch the coordinates of the precursor location in "raw" format (im, rt)
+    def fetchPrecursorRawLocation(self, precursorId):
+        self.oswFile = self.oswFile.subset_data_for_precursor(precursorId)
+        precursorMetaData = self.oswFile.oswfile_data_current_precursor_subset[self.oswFile.oswfile_data_current_precursor_subset['peak_group_rank'] == 1.0].iloc[0]
+
+        rt = self.timsTOF.convert_to_indices(precursorMetaData['RT'] * 60, return_frame_indices=True)
+        im = self.timsTOF.convert_to_indices(precursorMetaData['IM'], return_scan_indices=True)
+
+        return (im, rt)
+
+
+
+
 
 
 class PeptideExtraction(param.Parameterized):
@@ -108,7 +121,8 @@ class PeptideExtraction(param.Parameterized):
     # extraction preferences (optional, already have default values)
     rtExtraction = param.Number(doc='retention time extraction width (in seconds) on either side of the peptide', default=30, allow_None=False)
     imExtraction = param.Number(doc='IM extraction width (in 1/k0) on either side of the peptide', default=0.05, allow_None=False)
-    ppm = param.Number(doc='ppm extraction around the m/z', default=50, allow_None=False)
+    ppm = param.Number(doc='ppm extraction around the m/z (for MS2)', default=50, allow_None=False)
+    ppm_ms1 = param.Number(doc='ppm extraction around the m/z (for MS1)', default=None, allow_None=True)
 
     
     def __init__(self, **params):
@@ -127,10 +141,18 @@ class PeptideExtraction(param.Parameterized):
             self.im - self.imExtraction,
             self.im + self.imExtraction
         )
-        precursor_mz_slice = slice(
-            self.mz / (1 + self.ppm / 10**6),
-            self.mz * (1 + self.ppm / 10**6)
-        )
+        # if ppm_ms1 is specified use it for computation, otherwise just use the MS2 ppm
+        if self.ppm_ms1 == None:
+            precursor_mz_slice = slice(
+                self.mz / (1 + self.ppm / 10**6),
+                self.mz * (1 + self.ppm / 10**6)
+            )
+        else:
+            precursor_mz_slice = slice(
+                            self.mz / (1 + self.ppm_ms1 / 10**6),
+                            self.mz * (1 + self.ppm_ms1 / 10**6)
+                        )
+
         precursor_indices = dia_data[
             rt_slice,
             im_slice,
@@ -185,7 +207,7 @@ class PeptideExtraction(param.Parameterized):
                 precursor_indices,
                 width=900,
                 label="precursor",
-                **kwargs
+                **lineplot_kwargs
             )
 
         return precursor_xic
